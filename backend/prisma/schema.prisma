@@ -1,0 +1,145 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================== USER ==================
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  passwordHash  String
+  name          String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  resumes       Resume[]
+  analyses      Analysis[]
+  creations     ResumeCreation[]
+
+  @@map("users")
+}
+
+// ================== RESUME ==================
+model Resume {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title         String     @default("Meu Currículo")
+  template      String     @default("modern")
+  content       Json
+
+  publicToken   String?    @unique
+  isPublic      Boolean    @default(false)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  analyses      Analysis[]
+  creations     ResumeCreation[]
+
+  @@index([userId])
+  @@map("resumes")
+}
+
+// ================== ANALYSIS ==================
+model Analysis {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  resumeId      String?
+  resume        Resume?    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  // Scores
+  overallScore  Float
+  structureScore Float
+  experienceScore Float
+  educationScore Float
+  skillsScore   Float
+  summaryScore  Float
+  atsScore      Float
+
+  // Data
+  analysisData  Json
+  recommendations Json[]
+
+  // Keywords
+  keywordsFound   String[]
+  keywordsMissing String[]
+  aiSuggestions  Json[]
+
+  // ⭐ Flag para indicar se deve sugerir criação
+  suggestCreation Boolean @default(false)
+  extractedData   Json?   // Dados extraídos para criação
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([resumeId])
+  @@map("analyses")
+}
+
+// ================== RESUME CREATION ==================
+model ResumeCreation {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relacionado com análise que sugeriu a criação
+  analysisId    String?
+  
+  // Resume original que serviu de base
+  sourceResumeId String?
+  sourceResume  Resume?    @relation(fields: [sourceResumeId], references: [id], onDelete: SetNull)
+
+  // Dados extraídos do currículo anterior
+  extractedData Json
+
+  // Dados do novo currículo sendo criado
+  currentData   Json
+
+  // Sugestões de IA
+  aiSuggestions Json[]
+
+  // Template escolhido
+  template      String     @default("modern")
+
+  // Status da criação
+  status        String     @default("in_progress") // in_progress, completed, abandoned
+
+  // Versão final salva (optional)
+  finalResumeId String?
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([sourceResumeId])
+  @@map("resume_creations")
+}
+
+// ================== TEMPLATE ==================
+model Template {
+  id            String     @id @default(cuid())
+  name          String     @unique
+  slug          String     @unique
+  description   String
+  thumbnail     String?
+
+  structure     Json
+  styles        Json
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("templates")
+}

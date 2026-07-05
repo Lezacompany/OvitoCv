@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ovitocv-postgres
+    environment:
+      POSTGRES_DB: ovitocv
+      POSTGRES_USER: ovitocv_user
+      POSTGRES_PASSWORD: secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ovitocv-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ovitocv_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ovitocv-backend
+    environment:
+      DATABASE_URL: postgresql://ovitocv_user:secure_password_123@postgres:5432/ovitocv
+      NODE_ENV: development
+      PORT: 5000
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - ovitocv-network
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ovitocv-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+      REACT_APP_APP_NAME: OvitoCv
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - ovitocv-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  ovitocv-network:
+    driver: bridge
